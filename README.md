@@ -1,3 +1,3 @@
-# Alfred Agent Scripts
+# Alfred Device Monitor Scripts
 
-Public scripts used to install the Alfred Agent
+Public scripts used to install the Alfred Device Monitor

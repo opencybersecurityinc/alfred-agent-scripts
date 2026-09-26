@@ -1,201 +1,128 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Installs the Alfred Device Monitor on Linux (systemd).
+#
+# Required environment variables:
+#   ALFRED_KEY          Agent key from Alfred > Settings > Agent keys (alfa_...)
+#   ALFRED_OWNER_EMAIL  Email of the person who owns this computer
+#   ALFRED_REGION       us, eu or aus
+#   ALFRED_API_URL      Your Alfred address, for example https://alfred.example.com
+# Optional:
+#   ALFRED_NOSTART=true Install without enrolling or starting the timer yet
+set -euo pipefail
+umask 077
 
-# Available environment variables:
-# ALFRED_KEY (the Alfred per-domain secret key)
-# ALFRED_OWNER_EMAIL (the email of the person who owns this computer)
-# ALFRED_REGION (the region Alfred Device Monitor talks to, such as "us", "eu" or "aus".)
-# ALFRED_NOSTART (if true, then don't start the service upon installation.)
+AGENT_URL="https://raw.githubusercontent.com/opencybersecurityinc/alfred-agent-scripts/main/alfred-agent.sh"
+# Must match alfred-agent.sh in this repository; run ./update-checksums.sh after editing the agent.
+AGENT_SHA256="2cc99706e779ce898bed419c6e8b2cdce3bb90e68192d640c55ad0258ef6974e"
+SUPPORT="support@trust.builders"
 
-set -e
+BIN_PATH="/usr/local/bin/alfred-agent"
+CONFIG_DIR="/etc/alfred-agent"
+UNIT_DIR="/etc/systemd/system"
 
-DEB_URL="https://agent-downloads.trust.builders/targets/versions/1.0.0/alfred-amd64.deb"
-# Checksums need to be updated when DEB_URL is updated.
-DEB_CHECKSUM="REPLACE_WITH_ALFRED_DEB_SHA256"
-DEB_PATH="$(mktemp -d)/alfred.deb"
-DEB_INSTALL_CMD="dpkg -Ei"
-
-UUID_PATH="/sys/class/dmi/id/product_uuid"
-
-# OS/Distro Detection
-# Try lsb_release, fallback with /etc/issue then uname command
-# Detection code taken from https://github.com/DataDog/datadog-agent/blob/master/cmd/agent/install_script.sh
-KNOWN_DISTRIBUTION="(Debian|Ubuntu)"
-DISTRIBUTION=$(lsb_release -d 2>/dev/null | grep -Eo $KNOWN_DISTRIBUTION  || grep -Eo $KNOWN_DISTRIBUTION /etc/issue 2>/dev/null || grep -Eo $KNOWN_DISTRIBUTION /etc/Eos-release 2>/dev/null || grep -m1 -Eo $KNOWN_DISTRIBUTION /etc/os-release 2>/dev/null || uname -s)
-
-if [ -f /etc/debian_version -o "$DISTRIBUTION" == "Debian" -o "$DISTRIBUTION" == "Ubuntu" ]; then
-    OS="Debian"
-fi
-
-##
-# Alfred needs to be installed as root; use sudo if not already uid 0
-##
-if [ $(echo "$UID") = "0" ]; then
-    SUDO=''
-else
-    SUDO='sudo'
-fi
-
-function get_platform() {
-    if ! command -v lsb_release &> /dev/null; then
-        echo "${DISTRIBUTION}"
-    else
-	lsb_release -sd
-    fi
+fail() {
+  printf '\033[31m%s\n\nNeed help? Contact %s.\033[0m\n' "$*" "$SUPPORT" >&2
+  exit 1
 }
+step() { printf '\033[34m\n* %s\n\033[0m' "$*"; }
 
-if [ "${OS}" == "Debian" ]; then
-    printf "\033[34m\n* Debian detected \n\033[0m"
-    PKG_URL=$DEB_URL
-    PKG_PATH=$DEB_PATH
-    INSTALL_CMD=$DEB_INSTALL_CMD
-    CHECKSUM=$DEB_CHECKSUM
-else
-    printf "\033[31m
-Cannot install Alfred Device Monitor on unsupported platform $(get_platform).
-Please reach out to support@trust.builders for help.
-\n\033[0m\n"
-    exit 1
-fi
-
-if [ ! -f "$UUID_PATH" ]; then
-    printf "\033[31m
-Unable to detect hardware UUID – Alfred Device Monitor is only supported on platforms which provide a value in $UUID_PATH
-\n\033[0m\n"
-    exit 1
-fi
-
-hardware_uuid=$($SUDO cat $UUID_PATH)
-
-printf "\033[34m\nHardware UUID: $hardware_uuid\n\033[0m"
-
-bad_uuids=(
-    "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"
-    "ffffffff-ffff-ffff-ffff-ffffffffffff"
-    "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"
-    "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    "00000000-0000-0000-0000-000000000000"
-    "11111111-1111-1111-1111-111111111111"
-    "03000200-0400-0500-0006-000700080009"
-    "03020100-0504-0706-0809-0a0b0c0d0e0f"
-    "03020100-0504-0706-0809-0a0b0c0d0e0f"
-    "10000000-0000-8000-0040-000000000000"
-    "01234567-8910-1112-1314-151617181920"
-)
-
-for uuid in ${bad_uuids[*]}; do
-    if [ "$uuid" = "$hardware_uuid" ]; then
-        printf "\033[31m
-Invalid hardware UUID – Alfred Device Monitor is only supported on platforms which provide a unique value in $UUID_PATH
-\n\033[0m\n"
-        exit 1
-    fi
+[ "$(uname -s)" = "Linux" ] || fail "This installer is for Linux. Use install-macos.sh or install-windows.ps1."
+command -v systemctl >/dev/null 2>&1 || fail "systemd is required to schedule check-ins."
+for tool in curl sha256sum; do
+  command -v "$tool" >/dev/null 2>&1 || fail "$tool is required. Install it with your package manager and retry."
 done
-printf "\033[34m\nUUID check passed.\n\033[0m"
 
+ALFRED_KEY="${ALFRED_KEY:-}"
+ALFRED_OWNER_EMAIL="${ALFRED_OWNER_EMAIL:-}"
+ALFRED_REGION="${ALFRED_REGION:-}"
+ALFRED_API_URL="${ALFRED_API_URL:-}"
+ALFRED_API_URL="${ALFRED_API_URL%/}"
 
+[[ "$ALFRED_KEY" =~ ^alfa_[A-Za-z0-9_-]{32,64}$ ]] ||
+  fail "Set ALFRED_KEY to an agent key from Alfred > Settings > Agent keys."
+[[ "$ALFRED_OWNER_EMAIL" =~ ^[^[:space:]@\"\\]{1,64}@[^[:space:]@\"\\]{1,255}$ ]] ||
+  fail "Set ALFRED_OWNER_EMAIL to the email of the person who owns this computer."
+case "$ALFRED_REGION" in us | eu | aus) ;; *) fail "Set ALFRED_REGION to us, eu or aus." ;; esac
+[[ "$ALFRED_API_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$ ]] ||
+  fail "Set ALFRED_API_URL to your Alfred https:// address."
 
-if [ -z "$ALFRED_KEY" ]; then
-    printf "\033[31m
-You must specify the ALFRED_KEY environment variable in order to install Alfred Device Monitor.
-\n\033[0m\n"
-    exit 1
-fi
-if [ -z "$ALFRED_OWNER_EMAIL" ]; then
-    printf "\033[31m
-You must specify the ALFRED_OWNER_EMAIL environment variable in order to install Alfred Device Monitor.
-\n\033[0m\n"
-    exit 1
-fi
-if [ -z "$ALFRED_REGION" ]; then
-    printf "\033[31m
-You must specify the ALFRED_REGION environment variable in order to install Alfred Device Monitor.
-\n\033[0m\n"
-    exit 1
-fi
-
-function onerror() {
-    printf "\033[31m$ERROR_MESSAGE
-Something went wrong while installing Alfred Device Monitor.
-
-If you're having trouble installing, please send an email to support@trust.builders, and we'll help you fix it!
-\n\033[0m\n"
+as_root() {
+  if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo "$@"; fi
 }
-trap onerror ERR
 
-##
-# Download Alfred Device Monitor
-##
-printf "\033[34m\n* Downloading Alfred Device Monitor\n\033[0m"
-rm -f $PKG_PATH
-curl --progress-bar --output $PKG_PATH $PKG_URL
+WORK_DIR="$(mktemp -d)"
+trap 'rm -rf "$WORK_DIR"' EXIT
 
-##
-# Checksum
-##
-printf "\033[34m\n* Ensuring checksums match\n\033[0m"
+step "Downloading the Alfred Device Monitor agent"
+curl -fsSL --proto '=https' --tlsv1.2 --max-time 60 -o "$WORK_DIR/alfred-agent" "$AGENT_URL" ||
+  fail "Could not download the agent from $AGENT_URL."
 
-if [ -x "$(command -v shasum)" ]; then
-  downloaded_checksum=$(shasum -a256 $PKG_PATH | cut -d" " -f1)
-elif [ -x "$(command -v sha256sum)" ]; then
-  downloaded_checksum=$(sha256sum $PKG_PATH | cut -d" " -f1)
-else
-  printf "\033[31m shasum is not installed. Not checking binary contents. \033[0m\n"
-  # For now, don't fail if shasum is not installed. Delete this check if you want to
-  # ensure that the checksum is always enforced.
-  CHECKSUM=""
+step "Verifying the agent checksum"
+actual="$(sha256sum "$WORK_DIR/alfred-agent" | cut -d' ' -f1)"
+[ "$actual" = "$AGENT_SHA256" ] || fail "Checksum mismatch (expected $AGENT_SHA256, got $actual). Installation stopped."
+
+step "Installing. You might be asked for your password..."
+as_root install -d -o root -g root -m 755 /usr/local/bin
+as_root install -o root -g root -m 755 "$WORK_DIR/alfred-agent" "$BIN_PATH"
+as_root install -d -o root -g root -m 700 "$CONFIG_DIR"
+
+# Written through stdin so the key never appears in a process argument list.
+write_private() {
+  # shellcheck disable=SC2016 # $1 expands in the child shell
+  as_root sh -c 'umask 077; rm -f "$1"; cat >"$1"' sh "$1"
+}
+printf 'API_URL=%s\nOWNER_EMAIL=%s\nREGION=%s\n' "$ALFRED_API_URL" "$ALFRED_OWNER_EMAIL" "$ALFRED_REGION" |
+  write_private "$CONFIG_DIR/agent.conf"
+printf 'header = "Authorization: Bearer %s"\n' "$ALFRED_KEY" | write_private "$CONFIG_DIR/auth.curl"
+
+write_unit() {
+  # shellcheck disable=SC2016 # $1 expands in the child shell
+  as_root sh -c 'umask 022; cat >"$1"' sh "$1"
+}
+write_unit "$UNIT_DIR/alfred-agent.service" <<EOF
+[Unit]
+Description=Alfred Device Monitor check-in
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$BIN_PATH checkin
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=full
+EOF
+write_unit "$UNIT_DIR/alfred-agent.timer" <<'EOF'
+[Unit]
+Description=Hourly Alfred Device Monitor check-in
+
+[Timer]
+OnBootSec=2min
+OnCalendar=hourly
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+as_root systemctl daemon-reload
+
+if [ "${ALFRED_NOSTART:-}" = "true" ]; then
+  printf '\033[32m\nInstalled without starting. Run "sudo alfred-agent enroll" and\n"sudo systemctl enable --now alfred-agent.timer" when ready.\033[0m\n'
+  exit 0
 fi
 
-if [ $downloaded_checksum = $CHECKSUM ]; then
-    printf "\033[34mChecksums match.\n\033[0m"
-else
-    printf "\033[31m Checksums do not match. Please contact support@trust.builders \033[0m\n"
-    exit 1
-fi
+step "Enrolling this device"
+as_root "$BIN_PATH" enroll || fail "Enrollment failed. Check the key, owner email and ALFRED_API_URL."
 
-##
-# Install Alfred Device Monitor
-##
-printf "\033[34m\n* Installing Alfred Device Monitor. You might be asked for your password...\n\033[0m"
-$SUDO env \
-    ALFRED_KEY="$ALFRED_KEY" \
-    ALFRED_OWNER_EMAIL="$ALFRED_OWNER_EMAIL" \
-    ALFRED_REGION="$ALFRED_REGION" \
-    ${ALFRED_NOSTART:+ALFRED_NOSTART="$ALFRED_NOSTART"} \
-    $INSTALL_CMD $PKG_PATH
+step "Scheduling hourly check-ins"
+as_root systemctl enable --now alfred-agent.timer
 
+printf '\033[32m
+The Alfred Device Monitor is installed and reports to Alfred every hour.
 
-##
-# Check whether Alfred Device Monitor is registered. It may take a couple of seconds,
-# so try 5 times with 5-second pauses in between.
-##
-if [ -z "$ALFRED_SKIP_REGISTRATION_CHECK" ] && [ -z "$ALFRED_NOSTART" ]; then
-    printf "\033[34m\n* Checking registration with Alfred\n\033[0m"
-    registration_success=false
-    for i in {1..5}
-    do
-        # Pause first, as the chances of registration working immediately are low.
-        sleep 5
-        echo "Attempt $i/5"
-        if $SUDO /var/alfred/alfred-cli check-registration; then
-            registration_success=true
-            break
-        fi
-    done
-
-    if [ "$registration_success" = false ] ; then
-        printf "\033[31m
-    Could not verify that Alfred Device Monitor is registered to an Alfred domain. Are you sure you used the right key?
-    \n\033[0m\n" >&2
-        exit 0
-    fi
-
-else
-    printf "\033[34m\n* Skipping registration check\n\033[0m"
-fi
-
-printf "\033[32m
-Alfred Device Monitor has been installed successfully.
-It will run in the background and submit data to Alfred.
-
-You can check the status of Alfred Device Monitor using the \"/var/alfred/alfred-cli status\" command.
-\033[0m"
+  Status:     sudo alfred-agent status
+  Check in:   sudo alfred-agent checkin
+  Uninstall:  sudo alfred-agent uninstall
+\033[0m\n'

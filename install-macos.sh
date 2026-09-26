@@ -1,132 +1,123 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+# Installs the Alfred Device Monitor on macOS.
+#
+# Required environment variables:
+#   ALFRED_KEY          Agent key from Alfred > Settings > Agent keys (alfa_...)
+#   ALFRED_OWNER_EMAIL  Email of the person who owns this computer
+#   ALFRED_REGION       us, eu or aus
+#   ALFRED_API_URL      Your Alfred address, for example https://alfred.example.com
+# Optional:
+#   ALFRED_NOSTART=true Install without enrolling or scheduling check-ins yet
+set -euo pipefail
+umask 077
 
-# Environment variables:
-# ALFRED_KEY (the Alfred per-domain secret key)
-# ALFRED_OWNER_EMAIL (the email of the person who owns this computer)
-# ALFRED_REGION (the region Alfred Device Monitor talks to, such as "us", "eu" or "aus".)
+AGENT_URL="https://raw.githubusercontent.com/opencybersecurityinc/alfred-agent-scripts/main/alfred-agent.sh"
+# Must match alfred-agent.sh in this repository; run ./update-checksums.sh after editing the agent.
+AGENT_SHA256="2cc99706e779ce898bed419c6e8b2cdce3bb90e68192d640c55ad0258ef6974e"
+SUPPORT="support@trust.builders"
 
-PKG_URL="https://agent-downloads.trust.builders/targets/versions/1.0.0/alfred-universal.pkg"
-# Checksum needs to be updated when PKG_URL is updated.
-CHECKSUM="REPLACE_WITH_ALFRED_PKG_SHA256"
-DEVELOPER_ID="Open Cybersecurity LLC (REPLACE_WITH_APPLE_TEAM_ID)"
-CERT_SHA_FINGERPRINT="REPLACE_WITH_ALFRED_CERT_SHA256_FINGERPRINT"
-PKG_PATH="$(mktemp -d)/alfred.pkg"
-ALFRED_CONF_PATH="/etc/alfred.conf"
+LABEL="com.alfred.devicemonitor"
+BIN_PATH="/usr/local/bin/alfred-agent"
+CONFIG_DIR="/Library/Application Support/Alfred Device Monitor"
+PLIST_PATH="/Library/LaunchDaemons/$LABEL.plist"
+LOG_PATH="/var/log/alfred-agent.log"
 
-##
-# Alfred needs to be installed as root; use sudo if not already uid 0
-##
-if [ $(echo "$UID") = "0" ]; then
-    SUDO=''
-else
-    SUDO='sudo -E'
-fi
-
-if [ -z "$ALFRED_KEY" ]; then
-    printf "\033[31m
-You must specify the ALFRED_KEY environment variable in order to install Alfred Device Monitor.
-\n\033[0m\n"
-    exit 1
-fi
-
-if [ -z "$ALFRED_OWNER_EMAIL" ]; then
-    printf "\033[31m
-You must specify the ALFRED_OWNER_EMAIL environment variable in order to install Alfred Device Monitor.
-\n\033[0m\n"
-    exit 1
-fi
-
-if [ -z "$ALFRED_REGION" ]; then
-    printf "\033[31m
-You must specify the ALFRED_REGION environment variable in order to install Alfred Device Monitor.
-\n\033[0m\n"
-    exit 1
-fi
-
-
-function onerror() {
-    printf "\033[31m$ERROR_MESSAGE
-Something went wrong while installing Alfred Device Monitor.
-
-If you're having trouble installing, please send an email to support@trust.builders, and we'll help you fix it!
-\n\033[0m\n"
+fail() {
+  printf '\033[31m%s\n\nNeed help? Contact %s.\033[0m\n' "$*" "$SUPPORT" >&2
+  exit 1
 }
-trap onerror ERR
+step() { printf '\033[34m\n* %s\n\033[0m' "$*"; }
 
-##
-# Download Alfred Device Monitor
-##
-printf "\033[34m\n* Downloading Alfred Device Monitor\n\033[0m"
-rm -f $PKG_PATH
-curl --progress-bar $PKG_URL >$PKG_PATH
+[ "$(uname -s)" = "Darwin" ] || fail "This installer is for macOS. Use install-linux.sh or install-windows.ps1."
 
-##
-# Checksum
-##
-printf "\033[34m\n* Ensuring checksums match\n\033[0m"
-downloaded_checksum=$(shasum -a256 $PKG_PATH | cut -d" " -f1)
-if [ $downloaded_checksum = $CHECKSUM ]; then
-    printf "\033[34mChecksums match.\n\033[0m"
-else
-    printf "\033[31m Checksums do not match. Please contact support@trust.builders \033[0m\n"
-    rm -f $PKG_PATH
-    exit 1
+ALFRED_KEY="${ALFRED_KEY:-}"
+ALFRED_OWNER_EMAIL="${ALFRED_OWNER_EMAIL:-}"
+ALFRED_REGION="${ALFRED_REGION:-}"
+ALFRED_API_URL="${ALFRED_API_URL:-}"
+ALFRED_API_URL="${ALFRED_API_URL%/}"
+
+[[ "$ALFRED_KEY" =~ ^alfa_[A-Za-z0-9_-]{32,64}$ ]] ||
+  fail "Set ALFRED_KEY to an agent key from Alfred > Settings > Agent keys."
+[[ "$ALFRED_OWNER_EMAIL" =~ ^[^[:space:]@\"\\]{1,64}@[^[:space:]@\"\\]{1,255}$ ]] ||
+  fail "Set ALFRED_OWNER_EMAIL to the email of the person who owns this computer."
+case "$ALFRED_REGION" in us | eu | aus) ;; *) fail "Set ALFRED_REGION to us, eu or aus." ;; esac
+[[ "$ALFRED_API_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$ ]] ||
+  fail "Set ALFRED_API_URL to your Alfred https:// address."
+
+as_root() {
+  if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo "$@"; fi
+}
+
+WORK_DIR="$(mktemp -d)"
+trap 'rm -rf "$WORK_DIR"' EXIT
+
+step "Downloading the Alfred Device Monitor agent"
+curl -fsSL --proto '=https' --tlsv1.2 --max-time 60 -o "$WORK_DIR/alfred-agent" "$AGENT_URL" ||
+  fail "Could not download the agent from $AGENT_URL."
+
+step "Verifying the agent checksum"
+actual="$(shasum -a 256 "$WORK_DIR/alfred-agent" | cut -d' ' -f1)"
+[ "$actual" = "$AGENT_SHA256" ] || fail "Checksum mismatch (expected $AGENT_SHA256, got $actual). Installation stopped."
+
+step "Installing. You might be asked for your password..."
+as_root /bin/mkdir -p /usr/local/bin
+as_root /usr/bin/install -o root -g wheel -m 755 "$WORK_DIR/alfred-agent" "$BIN_PATH"
+as_root /bin/mkdir -p "$CONFIG_DIR"
+as_root /usr/sbin/chown root:wheel "$CONFIG_DIR"
+as_root /bin/chmod 700 "$CONFIG_DIR"
+
+# Written through stdin so the key never appears in a process argument list.
+write_private() {
+  # shellcheck disable=SC2016 # $1 expands in the child shell
+  as_root /bin/sh -c 'umask 077; rm -f "$1"; cat >"$1"' sh "$1"
+}
+printf 'API_URL=%s\nOWNER_EMAIL=%s\nREGION=%s\n' "$ALFRED_API_URL" "$ALFRED_OWNER_EMAIL" "$ALFRED_REGION" |
+  write_private "$CONFIG_DIR/agent.conf"
+printf 'header = "Authorization: Bearer %s"\n' "$ALFRED_KEY" | write_private "$CONFIG_DIR/auth.curl"
+
+# shellcheck disable=SC2016 # $1 expands in the child shell
+as_root /bin/sh -c 'umask 022; cat >"$1"' sh "$PLIST_PATH" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$BIN_PATH</string>
+    <string>checkin</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>3600</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>$LOG_PATH</string>
+  <key>StandardErrorPath</key>
+  <string>$LOG_PATH</string>
+</dict>
+</plist>
+EOF
+as_root /usr/sbin/chown root:wheel "$PLIST_PATH"
+as_root /bin/chmod 644 "$PLIST_PATH"
+
+if [ "${ALFRED_NOSTART:-}" = "true" ]; then
+  printf '\033[32m\nInstalled without starting. Run "sudo alfred-agent enroll" and\n"sudo launchctl bootstrap system %s" when ready.\033[0m\n' "$PLIST_PATH"
+  exit 0
 fi
 
-##
-# Check Developer ID
-##
-printf "\033[34m\n* Ensuring package Developer ID matches\n\033[0m"
+step "Enrolling this Mac"
+as_root "$BIN_PATH" enroll || fail "Enrollment failed. Check the key, owner email and ALFRED_API_URL."
 
-if pkgutil --check-signature $PKG_PATH | /usr/bin/grep -q "$DEVELOPER_ID"; then
-    printf "\033[34mDeveloper ID matches.\n\033[0m"
-else
-    printf "\033[31m Developer ID does not match. Please contact support@trust.builders \033[0m\n"
-    rm -f $PKG_PATH
-    exit 1
-fi
+step "Scheduling hourly check-ins"
+as_root /bin/launchctl bootout "system/$LABEL" 2>/dev/null || true
+as_root /bin/launchctl bootstrap system "$PLIST_PATH"
 
-##
-# Check Developer Certificate Fingerprint
-##
-printf "\033[34m\n* Ensuring package Developer Certificate Fingerprint matches\n\033[0m"
-if pkgutil --check-signature $PKG_PATH | /usr/bin/tr -d '\n' | /usr/bin/tr -d ' ' | /usr/bin/grep -q "SHA256Fingerprint:$CERT_SHA_FINGERPRINT"; then
-    printf "\033[34mDeveloper Certificate Fingerprint matches.\n\033[0m"
-else
-    printf "\033[31m Developer Certificate Fingerprint does not match. Please contact support@trust.builders \033[0m\n"
-    rm -f $PKG_PATH
-    exit 1
-fi
+printf '\033[32m
+The Alfred Device Monitor is installed and reports to Alfred every hour.
 
-##
-# Install Alfred Device Monitor
-##
-printf "\033[34m\n* Installing Alfred Device Monitor. You might be asked for your password...\n\033[0m"
-ACTIVATION_REQUESTED_NONCE=$(date +%s000)
-CONFIG="{\"ACTIVATION_REQUESTED_NONCE\":$ACTIVATION_REQUESTED_NONCE,\"AGENT_KEY\":\"$ALFRED_KEY\",\"OWNER_EMAIL\":\"$ALFRED_OWNER_EMAIL\",\"NEEDS_OWNER\":true,\"REGION\":\"$ALFRED_REGION\"}"
-echo "$CONFIG" | $SUDO tee "$ALFRED_CONF_PATH" > /dev/null
-$SUDO /bin/chmod 600 "$ALFRED_CONF_PATH"
-$SUDO /usr/sbin/chown root:wheel "$ALFRED_CONF_PATH"
-$SUDO /usr/sbin/installer -pkg $PKG_PATH -target / >/dev/null
-rm -f $PKG_PATH
-
-##
-# check if Alfred Device Monitor is running
-# return val 0 means running,
-# return val 2 means running but needs to register
-##
-$SUDO /usr/local/alfred/alfred-cli status || [ $? == 2 ]
-
-printf "\033[32m
-Your Alfred Device Monitor is running properly. It will continue to run in the
-background and submit data to Alfred.
-
-You can check the status of Alfred Device Monitor using the \"alfred-cli status\" command.
-
-If you ever want to stop Alfred Device Monitor, please use the toolbar icon or
-the alfred-cli command. It will restart automatically at login.
-
-To register this device to a new user, run \"alfred-cli register\" or click on \"Register Alfred Device Monitor\"
-on the toolbar.
-\033[0m"
+  Status:     sudo alfred-agent status
+  Check in:   sudo alfred-agent checkin
+  Uninstall:  sudo alfred-agent uninstall
+\033[0m\n'

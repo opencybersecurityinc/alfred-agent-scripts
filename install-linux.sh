@@ -15,7 +15,7 @@ umask 077
 
 AGENT_URL="https://raw.githubusercontent.com/opencybersecurityinc/alfred-agent-scripts/main/alfred-agent.sh"
 # Must match alfred-agent.sh in this repository; run ./update-checksums.sh after editing the agent.
-AGENT_SHA256="4c569cf6e26ad3d59727bae0d3599b2796f9fdfd0e3abbd1286f06370b60155b"
+AGENT_SHA256="df3421bdeba57412d986471ae788b986c7b801c250bb600e9fb8dc5b3bc97132"
 SUPPORT="support@trust.builders"
 # Publishing a signature is optional until a signing certificate is pinned
 # below; once SIGNING_CERT_SHA256 is set, a missing or invalid signature stops
@@ -152,8 +152,10 @@ write_private() {
 # one, so a copied or replayed bootstrap config cannot re-bind the device.
 ACTIVATION_NONCE="$(date +%s%3N 2>/dev/null || true)"
 [[ "$ACTIVATION_NONCE" =~ ^[0-9]{13}$ ]] || ACTIVATION_NONCE="$(date +%s)000"
-printf 'API_URL=%s\nOWNER_EMAIL=%s\nREGION=%s\nACTIVATION_NONCE=%s\n' \
-  "$ALFRED_API_URL" "$ALFRED_OWNER_EMAIL" "$ALFRED_REGION" "$ACTIVATION_NONCE" |
+INSECURE_LINE=""
+case "$ALFRED_API_URL" in http://*) INSECURE_LINE="ALLOW_INSECURE_LOCALHOST=1" ;; esac
+printf 'API_URL=%s\nOWNER_EMAIL=%s\nREGION=%s\nACTIVATION_NONCE=%s\n%s\n' \
+  "$ALFRED_API_URL" "$ALFRED_OWNER_EMAIL" "$ALFRED_REGION" "$ACTIVATION_NONCE" "$INSECURE_LINE" |
   write_private "$CONFIG_DIR/agent.conf"
 printf 'header = "Authorization: Bearer %s"\n' "$ALFRED_KEY" | write_private "$CONFIG_DIR/auth.curl"
 as_root chown root:root "$CONFIG_DIR/agent.conf" "$CONFIG_DIR/auth.curl"

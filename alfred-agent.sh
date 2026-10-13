@@ -76,7 +76,10 @@ conf_get() {
 valid_api_url() {
   local url="$1"
   [[ "$url" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$ ]] && return 0
-  if [ "${ALFRED_ALLOW_INSECURE_LOCALHOST:-}" = "1" ] &&
+  # The opt-in can come from the environment or from the root-only config,
+  # where the installer records it because sudo and schedulers drop the env.
+  if { [ "${ALFRED_ALLOW_INSECURE_LOCALHOST:-}" = "1" ] ||
+    [ "$(conf_get ALLOW_INSECURE_LOCALHOST || true)" = "1" ]; } &&
     [[ "$url" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$ ]]; then
     return 0
   fi

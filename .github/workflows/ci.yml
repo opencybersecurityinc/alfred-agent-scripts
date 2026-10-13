@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck alfred-agent.sh install-linux.sh install-macos.sh update-checksums.sh tests/*.sh
+      - name: Installers are pinned to the current agents
+        run: |
+          ./update-checksums.sh
+          git diff --exit-code -- install-linux.sh install-macos.sh install-windows.ps1
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $findings = foreach ($file in 'alfred-agent.ps1', 'install-windows.ps1', 'tests/run-ai-scan-windows.ps1') {
+            Invoke-ScriptAnalyzer -Path $file -Severity Error
+          }
+          $findings | Format-Table -AutoSize
+          if ($findings) { exit 1 }
+
+  golden:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell collector golden tests
+        run: bash tests/run-ai-scan.sh
+      - name: PowerShell collector golden tests
+        shell: pwsh
+        run: ./tests/run-ai-scan-windows.ps1
+
+  golden-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell 7 golden tests
+        shell: pwsh
+        run: ./tests/run-ai-scan-windows.ps1
+      - name: Windows PowerShell 5.1 golden tests
+        shell: powershell
+        run: ./tests/run-ai-scan-windows.ps1
+
+  smoke-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install against a mock Alfred API
+        run: bash tests/smoke-install.sh

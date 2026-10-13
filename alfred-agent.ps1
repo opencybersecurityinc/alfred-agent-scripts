@@ -241,7 +241,7 @@ function Format-SecretArgs($Items) {
   $out = New-Object 'System.Collections.Generic.List[string]'
   $maskNext = $false
   foreach ($arg in $Items) {
-    if ($maskNext -and $arg -notmatch '^-') { $out.Add($AiSecret); $maskNext = $false; continue }
+    if ($maskNext) { $out.Add($AiSecret); $maskNext = $false; continue }
     $maskNext = $false
     if ($arg -match '(?s)^(--?[A-Za-z0-9][A-Za-z0-9_.-]*)=(.*)\z') {
       $flag = $Matches[1]
@@ -702,7 +702,7 @@ function Show-Status {
   Write-Output "AI inventory: $(if ($config.AiInventory -in 'off', 'false', '0') { 'off' } else { 'on' })"
   Write-Output 'Registration:'
   Invoke-CheckRegistration
-  if (-not $task) { $script:ExitCode = 1 }
+  if (-not $task -or $task.State -eq 'Disabled') { $script:ExitCode = 1 }
   elseif ($script:ExitCode -eq 3) { $script:ExitCode = 2 }
 }
 

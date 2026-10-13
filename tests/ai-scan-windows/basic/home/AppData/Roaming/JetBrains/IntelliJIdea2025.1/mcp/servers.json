@@ -1,1 +1,1 @@
-{ "mcpServers": { "gradle": { "command": "gradle-mcp", "args": ["--token=CANARYjb", "--port", "8080"] } } }
+{ "mcpServers": { "gradle": { "command": "gradle-mcp", "args": ["--token=CANARYjb", "--port", "8080", "--password", "-CANARYdash"] } } }

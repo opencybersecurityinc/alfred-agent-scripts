@@ -306,7 +306,7 @@ sub template_args {
   my $mask_next = 0;
   for my $arg (@_) {
     next unless defined $arg && !ref $arg;
-    if ($mask_next && $arg !~ /^-/) {
+    if ($mask_next) {
       push @out, $PH;
       $mask_next = 0;
       next;
@@ -898,8 +898,12 @@ cmd_status() {
   printf 'Registration: '
   (cmd_check_registration) || registration=$?
   if [ "$running" -eq 0 ]; then return 1; fi
-  if [ "$registration" -ne 0 ]; then return 2; fi
-  return 0
+  # Only a confirmed "not registered" answer maps to 2; lookup errors are 1.
+  case "$registration" in
+    0) return 0 ;;
+    3) return 2 ;;
+    *) return 1 ;;
+  esac
 }
 
 cmd_report() {

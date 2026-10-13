@@ -15,7 +15,7 @@ umask 077
 
 AGENT_URL="https://raw.githubusercontent.com/opencybersecurityinc/alfred-agent-scripts/main/alfred-agent.sh"
 # Must match alfred-agent.sh in this repository; run ./update-checksums.sh after editing the agent.
-AGENT_SHA256="df3421bdeba57412d986471ae788b986c7b801c250bb600e9fb8dc5b3bc97132"
+AGENT_SHA256="767f7eeab34d4bef7459940e53e7855bcc4d83881ba825662123f4f692b6708d"
 SUPPORT="support@trust.builders"
 # Publishing a signature is optional until a signing certificate is pinned
 # below; once SIGNING_CERT_SHA256 is set, a missing or invalid signature stops

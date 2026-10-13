@@ -22,7 +22,7 @@
   $ErrorActionPreference = 'Stop'
 
   $AgentUrl = 'https://raw.githubusercontent.com/opencybersecurityinc/alfred-agent-scripts/main/alfred-agent.ps1'
-  $AgentSha256 = '7c6532db4ccb2ede72a80cf3eb2721af66f8c1b7bca01cc9a256dfac9039005d'
+  $AgentSha256 = 'c61f42c88727d3528495ea5843ade05fd84b449172358cabfd2cb70b9d52169f'
   # Optional Authenticode pin. Once SigningThumbprint is set, the agent must carry
   # a valid signature whose certificate matches both the subject and the thumbprint.
   $SigningSubject = ''
@@ -121,7 +121,9 @@
     -Principal $taskPrincipal -Settings $settings -Description 'Reports device posture to Alfred.' -Force | Out-Null
 
   if ($switches['ALFRED_NOSTART']) {
+    Disable-ScheduledTask -TaskName $TaskName | Out-Null
     Write-Output "Alfred Device Monitor installed (not started). Run: powershell -File `"$AgentPath`" enroll"
+    Write-Output "Then start the schedule with: Enable-ScheduledTask -TaskName '$TaskName'"
     return
   }
 

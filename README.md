@@ -48,7 +48,7 @@ irm https://raw.githubusercontent.com/opencybersecurityinc/alfred-agent-scripts/
 
 Switches accept only `true`, `false` or an empty value. Any other value stops the install.
 
-The installer writes an activation nonce (the install time in epoch milliseconds) to the configuration. Alfred refuses an enrollment whose nonce is older than the last one seen for the device, so an old configuration copied onto another machine cannot replay its enrollment.
+The installer writes an activation nonce (the install time in epoch milliseconds) to the configuration. Alfred keeps the newest nonce per hardware UUID and refuses an enrollment that presents an older one, so restoring an old configuration on the same device cannot roll its enrollment back. The nonce does not stop a configuration copied to a different device, which has no prior nonce; treat the key as the secret and revoke it if a configuration leaks.
 
 ## Commands
 
@@ -95,12 +95,12 @@ Alfred computes the fingerprint of each asset on the server and links it to the 
 - Each installer downloads the agent over HTTPS and verifies a pinned SHA-256 before installing it. If the hashes differ, or no hashing tool is available, the install stops.
 - When a signing certificate is pinned, the installer also verifies the agent signature. On macOS and Linux it checks the certificate SHA-256 fingerprint and its subject before verifying the signature with `openssl`. On Windows it requires a valid Authenticode signature whose thumbprint and subject match the pin.
 - After installing, the installer checks that Alfred has registered the device, retrying a few times before it reports a failure.
-- The API address must use `https://`. The agent refuses any other scheme.
+- The API address must use `https://`. The agent refuses any other scheme. The only exception is a plain-http `localhost` or `127.0.0.1` address with `ALFRED_ALLOW_INSECURE_LOCALHOST=1`, for local testing; the installer then records the opt-in in the root-only configuration.
 - The key is stored in a file readable only by root, or by SYSTEM and Administrators on Windows. The agent refuses to run if the file permissions are looser.
 - The agent does not pass the key on the command line; `curl` reads it from a config file.
 - Inputs such as the key format, email, region and URL are validated before anything is written.
 - The agent only sends the fields listed above. Apart from AI client configuration files, it does not read files, browsing data, or user content, and it does not run remote commands.
-- The configuration directory and its files are owned by root (or SYSTEM) with mode `0600`. On macOS and Linux, the collector only reads AI client files owned by the user whose home it scans or by root, skips files larger than 1 MiB, and caps the number of projects and servers per device.
+- On macOS and Linux, the configuration directory is owned by root with mode `0700`, and its files with mode `0600`. On Windows, an ACL limits the directory and its files to SYSTEM and Administrators. On macOS and Linux, the collector only reads AI client files owned by the user whose home it scans or by root, skips files larger than 1 MiB, and caps the number of projects and servers per device.
 
 ## Maintainers
 

@@ -129,7 +129,7 @@
       },
       {
          "client" : "jetbrains",
-         "identity" : "gradle-mcp --token={secret} --port 8080",
+         "identity" : "gradle-mcp --token={secret} --port 8080 --password {secret}",
          "name" : "gradle",
          "scope" : "user",
          "tools" : [],

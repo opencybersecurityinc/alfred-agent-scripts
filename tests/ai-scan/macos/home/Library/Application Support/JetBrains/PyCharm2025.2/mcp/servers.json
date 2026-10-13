@@ -1,0 +1,1 @@
+{ "mcpServers": { "jwt": { "command": "jwt-mcp", "args": ["eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJDQU5BUlkifQ.c2lnbmF0dXJlX19fX19f"] } } }

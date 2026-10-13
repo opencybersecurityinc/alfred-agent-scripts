@@ -1,0 +1,1 @@
+{ "servers": { "fs": { "type": "stdio", "command": "@HOME@/bin/fs-mcp", "args": ["--root", "@HOME@/projects"] } }, "inputs": [] }

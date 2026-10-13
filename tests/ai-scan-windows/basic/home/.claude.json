@@ -1,0 +1,27 @@
+{
+  "numStartups": 12,
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_CANARYabcdefghijklmnopqrstuvwxyz0123" }
+    },
+    "remote-docs": {
+      "type": "http",
+      "url": "https://bob:CANARYpass@docs.example.com/mcp?api_key=CANARYquery#frag",
+      "headers": { "Authorization": "Bearer CANARYheader1234567890" }
+    }
+  },
+  "projects": {
+    "@HOME@/work/app": {
+      "allowedTools": ["mcp__db__query", "Bash(npm test)"],
+      "mcpServers": {
+        "db": {
+          "command": "postgres-mcp",
+          "args": ["postgresql://app:CANARYdbpass@db.internal:5432/app", "--password", "CANARYflagvalue", "--read-only"]
+        }
+      }
+    },
+    "@HOME@/work/missing": { "mcpServers": {} }
+  }
+}

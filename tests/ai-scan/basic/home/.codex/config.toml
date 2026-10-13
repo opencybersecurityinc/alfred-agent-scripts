@@ -1,0 +1,16 @@
+model = "o4-mini"
+
+[mcp_servers.docs]
+command = "npx"
+args = [
+  "-y",
+  "docs-mcp",   # inline comment
+  "--api-key", "sk-CANARYabcdefghijklmnop1234",
+]
+enabled_tools = ["search", "fetch"]
+
+[mcp_servers.docs.env]
+DOCS_TOKEN = "CANARYenvvalue"
+
+[mcp_servers."remote.search"]
+url = 'https://search.example.com/mcp?token=CANARYtoml'

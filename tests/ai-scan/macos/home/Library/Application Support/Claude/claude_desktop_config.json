@@ -1,0 +1,5 @@
+{ "mcpServers": {
+  "filesystem": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "@HOME@/Documents"] },
+  "weather": { "command": "uvx", "args": ["weather-mcp", "--api_key", "CANARYweatherkey99"], "env": { "API_KEY": "CANARYenv" } },
+  "aws": { "command": "aws-mcp", "args": ["AKIACANARY0123456789"] }
+} }

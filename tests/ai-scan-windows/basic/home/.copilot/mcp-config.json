@@ -1,0 +1,1 @@
+{ "mcpServers": { "broken": { "args": ["no command"] }, "slack": { "command": "slack-mcp", "args": ["xoxb-CANARY1234567890-abcdef"] } } }

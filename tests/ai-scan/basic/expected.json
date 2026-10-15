@@ -1,0 +1,171 @@
+{
+   "clients" : [
+      {
+         "client" : "claude_code",
+         "name" : "Claude Code"
+      },
+      {
+         "client" : "claude_desktop",
+         "name" : "Claude Desktop"
+      },
+      {
+         "client" : "codex",
+         "name" : "Codex"
+      },
+      {
+         "client" : "copilot_cli",
+         "name" : "GitHub Copilot CLI"
+      },
+      {
+         "client" : "cursor",
+         "name" : "Cursor"
+      },
+      {
+         "client" : "jetbrains",
+         "name" : "JetBrains IDEs"
+      },
+      {
+         "client" : "junie",
+         "name" : "Junie"
+      },
+      {
+         "client" : "vscode",
+         "name" : "Visual Studio Code"
+      },
+      {
+         "client" : "windsurf",
+         "name" : "Windsurf"
+      },
+      {
+         "client" : "zed",
+         "name" : "Zed"
+      }
+   ],
+   "servers" : [
+      {
+         "client" : "claude_code",
+         "identity" : "postgres-mcp postgresql://db.internal:5432/app --password {secret} --read-only",
+         "name" : "db",
+         "scope" : "project",
+         "tools" : [
+            "query"
+         ],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "claude_code",
+         "identity" : "https://mcp.linear.app/sse",
+         "name" : "linear",
+         "scope" : "project",
+         "tools" : [
+            "list_issues"
+         ],
+         "transport" : "sse"
+      },
+      {
+         "client" : "claude_code",
+         "identity" : "https://kb.example.com/mcp",
+         "name" : "company-kb",
+         "scope" : "system",
+         "tools" : [],
+         "transport" : "http"
+      },
+      {
+         "client" : "claude_code",
+         "identity" : "npx -y @modelcontextprotocol/server-github",
+         "name" : "github",
+         "scope" : "user",
+         "tools" : [
+            "create_issue",
+            "get_issue"
+         ],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "claude_code",
+         "identity" : "https://docs.example.com/mcp",
+         "name" : "remote-docs",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "http"
+      },
+      {
+         "client" : "codex",
+         "identity" : "npx -y docs-mcp --api-key {secret}",
+         "name" : "docs",
+         "scope" : "user",
+         "tools" : [
+            "fetch",
+            "search"
+         ],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "codex",
+         "identity" : "https://search.example.com/mcp",
+         "name" : "remote.search",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "http"
+      },
+      {
+         "client" : "copilot_cli",
+         "identity" : "slack-mcp {secret}",
+         "name" : "slack",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "cursor",
+         "identity" : "node /opt/browser-mcp/index.js TOKEN={secret} https://x.example.com/a",
+         "name" : "browser",
+         "scope" : "user",
+         "tools" : [
+            "navigate",
+            "screenshot"
+         ],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "jetbrains",
+         "identity" : "gradle-mcp --token={secret} --port 8080 --password {secret}",
+         "name" : "gradle",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "vscode",
+         "identity" : "~/bin/fs-mcp --root ~/projects",
+         "name" : "fs",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "vscode",
+         "identity" : "https://jira.example.com/mcp/{secret}",
+         "name" : "jira",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "http"
+      },
+      {
+         "client" : "windsurf",
+         "identity" : "https://notes.example.com/sse",
+         "name" : "notes",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "sse"
+      },
+      {
+         "client" : "zed",
+         "identity" : "ctx-mcp Bearer {secret}",
+         "name" : "ctx",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "stdio"
+      }
+   ]
+}

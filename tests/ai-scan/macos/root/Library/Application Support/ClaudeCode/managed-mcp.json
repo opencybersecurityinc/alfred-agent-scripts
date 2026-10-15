@@ -1,0 +1,1 @@
+{ "mcpServers": { "approved-search": { "command": "/usr/local/bin/search-mcp", "args": ["--endpoint", "https://search.corp.example/mcp"] } } }

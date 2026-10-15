@@ -1,0 +1,10 @@
+{
+  // Cursor accepts comments and trailing commas
+  "mcpServers": {
+    "browser": {
+      "command": "node",
+      "args": ["/opt/browser-mcp/index.js", "TOKEN=CANARYinlineenv12", "https://x.example.com/a?b=c"], /* note */
+      "alwaysAllow": ["navigate", "screenshot",],
+    },
+  },
+}

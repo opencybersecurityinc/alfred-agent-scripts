@@ -1,0 +1,83 @@
+{
+   "clients" : [
+      {
+         "client" : "claude_code",
+         "name" : "Claude Code"
+      },
+      {
+         "client" : "claude_desktop",
+         "name" : "Claude Desktop",
+         "version" : "0.14.2"
+      },
+      {
+         "client" : "gemini_cli",
+         "name" : "Gemini CLI"
+      },
+      {
+         "client" : "jetbrains",
+         "name" : "JetBrains IDEs"
+      },
+      {
+         "client" : "vscode",
+         "name" : "Visual Studio Code"
+      }
+   ],
+   "servers" : [
+      {
+         "client" : "claude_code",
+         "identity" : "/usr/local/bin/search-mcp --endpoint https://search.corp.example/mcp",
+         "name" : "approved-search",
+         "scope" : "system",
+         "tools" : [],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "claude_desktop",
+         "identity" : "aws-mcp {secret}",
+         "name" : "aws",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "claude_desktop",
+         "identity" : "npx -y @modelcontextprotocol/server-filesystem ~/Documents",
+         "name" : "filesystem",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "claude_desktop",
+         "identity" : "uvx weather-mcp --api_key {secret}",
+         "name" : "weather",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "gemini_cli",
+         "identity" : "https://gem.example.com/mcp",
+         "name" : "gem",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "http"
+      },
+      {
+         "client" : "jetbrains",
+         "identity" : "jwt-mcp {secret}",
+         "name" : "jwt",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "stdio"
+      },
+      {
+         "client" : "vscode",
+         "identity" : "https://legacy.example.com/mcp/",
+         "name" : "legacy",
+         "scope" : "user",
+         "tools" : [],
+         "transport" : "http"
+      }
+   ]
+}
